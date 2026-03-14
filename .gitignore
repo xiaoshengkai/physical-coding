@@ -5,3 +5,5 @@ npm-debug.log*
 config/config.json
 .env
 opencode.json
+skills/
+work-logs/

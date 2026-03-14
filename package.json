@@ -7,9 +7,16 @@
     "setup": "node scripts/setup.js",
     "connect": "node scripts/connect.js",
     "sync": "node scripts/sync.js",
-    "watch": "node scripts/watch.js"
+    "watch": "node scripts/watch.js",
+    "start": "npm run connect & npm run watch",
+    "run": "node scripts/run.js"
   },
-  "keywords": ["raspberry-pi", "embedded", "iot", "gpio"],
+  "keywords": [
+    "raspberry-pi",
+    "embedded",
+    "iot",
+    "gpio"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
