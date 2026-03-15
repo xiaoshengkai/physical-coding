@@ -1,8 +1,8 @@
-# 06 - TFT 彩屏显示
+# 09 - TFT 系统监视器
 
 ## 实验目标
 
-使用 1.8 英寸 SPI 接口 TFT 彩屏显示 "Hello Pi!"。
+在 1.8 英寸 SPI 接口 TFT 彩屏上显示树莓派系统实时监控数据（CPU、内存、温度、磁盘、IP、时间）。
 
 ## 硬件准备
 
@@ -41,6 +41,9 @@ sudo apt install python3-smbus python3-spidev
 # 安装 adafruit-circuitpython-rgb-display 库
 pip3 install adafruit-circuitpython-rgb-display
 
+# 安装 psutil 系统监控库
+pip3 install psutil
+
 # （可选）安装中文字体，用于显示中文
 sudo apt install fonts-wqy-microhei
 ```
@@ -72,38 +75,40 @@ GPIO25(Pin 22)  ──── DC
 ## 运行代码
 
 ```bash
-python demos/06-tft-display/tft-display.py
+python demos/09-system-monitor/system-monitor.py
 ```
 
 或使用快速命令：
 
 ```bash
-npm run run 06
+npm run run 09
 ```
 
 ## 效果
 
-屏幕显示：
-- 深蓝色背景
-- 黄色文字 "Hello Pi!"
-- 青色文字 "TFT Works"
-- 几何图形测试（矩形、椭圆、线条）
+屏幕实时显示：
+- 系统标题
+- CPU 使用率（带进度条）
+- 内存使用率（带进度条）
+- CPU 温度
+- 磁盘使用率（带进度条）
+- IP 地址
+- 当前时间
 
 ## 关键知识点
 
-1. **SPI 通信协议**: 了解 SPI 的时钟、数据输入、片选等信号
-2. **adafruit-circuitpython-rgb-display**: 官方树莓派显示库
-3. **PIL 绘图**: 使用 Python Imaging Library 绘制图形和文字
+1. **psutil 库**: Python 系统监控工具
+2. **实时数据采集**: 获取 CPU、内存、磁盘等系统信息
+3. **进度条绘制**: 使用 PIL 绘制可视化进度条
 
 ## 常见问题
 
-**屏幕不显示？**
-- 检查所有接线是否牢固
-- 检查 CS、D/C 接线是否正确
-- 确认库已正确安装
+**无法显示系统信息？**
+- 确认 psutil 已正确安装
+- 检查 SPI 接线是否正确
 
-**显示模糊？**
-- 尝试调整分辨率参数
+**中文显示为方块？**
+- 安装中文字体：`sudo apt install fonts-wqy-microhei`
 
-**颜色显示异常？**
-- 检查 SDI (MOSI) 和 CLK 接线是否正确
+**显示刷新太慢？**
+- 调整 `time.sleep()` 参数

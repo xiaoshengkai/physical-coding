@@ -1,8 +1,8 @@
-# 06 - TFT 彩屏显示
+# 08 - TFT 视频播放
 
 ## 实验目标
 
-使用 1.8 英寸 SPI 接口 TFT 彩屏显示 "Hello Pi!"。
+在 1.8 英寸 SPI 接口 TFT 彩屏上播放小视频。
 
 ## 硬件准备
 
@@ -41,9 +41,24 @@ sudo apt install python3-smbus python3-spidev
 # 安装 adafruit-circuitpython-rgb-display 库
 pip3 install adafruit-circuitpython-rgb-display
 
-# （可选）安装中文字体，用于显示中文
-sudo apt install fonts-wqy-microhei
+# 安装 OpenCV
+pip3 install opencv-python-headless Pillow
 ```
+
+### 3. 准备视频
+
+将视频文件复制到树莓派的 `~/Desktop/workspace/PhysicalCoding/static/videos/` 目录：
+
+```bash
+# 在本地创建目录并放入视频
+mkdir -p static/videos
+# 将你的视频重命名为 small_video.mp4 放入 static/videos 目录
+```
+
+视频要求：
+- 分辨率接近 128x160
+- 建议使用较小尺寸的视频文件
+- 格式支持 MP4、AVI 等常见格式
 
 ## 引脚分配
 
@@ -72,38 +87,36 @@ GPIO25(Pin 22)  ──── DC
 ## 运行代码
 
 ```bash
-python demos/06-tft-display/tft-display.py
+python demos/08-tft-video/tft-video.py
 ```
 
 或使用快速命令：
 
 ```bash
-npm run run 06
+npm run run 08
 ```
 
 ## 效果
 
-屏幕显示：
-- 深蓝色背景
-- 黄色文字 "Hello Pi!"
-- 青色文字 "TFT Works"
-- 几何图形测试（矩形、椭圆、线条）
+屏幕循环播放指定视频文件 `small_video.mp4`。
 
 ## 关键知识点
 
-1. **SPI 通信协议**: 了解 SPI 的时钟、数据输入、片选等信号
-2. **adafruit-circuitpython-rgb-display**: 官方树莓派显示库
-3. **PIL 绘图**: 使用 Python Imaging Library 绘制图形和文字
+1. **OpenCV 视频处理**: 使用 OpenCV 读取和解析视频文件
+2. **视频帧提取**: 从视频中逐帧提取图像
+3. **实时显示**: 将视频帧实时显示到 TFT 屏幕
 
 ## 常见问题
 
-**屏幕不显示？**
-- 检查所有接线是否牢固
-- 检查 CS、D/C 接线是否正确
-- 确认库已正确安装
+**视频无法播放？**
+- 检查视频文件路径是否正确
+- 确认视频格式和编码被 OpenCV 支持
+- 检查 SPI 接线是否正确
 
-**显示模糊？**
-- 尝试调整分辨率参数
+**播放卡顿？**
+- 降低视频分辨率
+- 降低帧率
+- 尝试降低 baudrate
 
-**颜色显示异常？**
-- 检查 SDI (MOSI) 和 CLK 接线是否正确
+**色彩异常？**
+- 检查 BGR 转 RGB 是否正确

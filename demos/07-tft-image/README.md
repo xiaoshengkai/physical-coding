@@ -1,8 +1,8 @@
-# 06 - TFT 彩屏显示
+# 07 - TFT 图片显示
 
 ## 实验目标
 
-使用 1.8 英寸 SPI 接口 TFT 彩屏显示 "Hello Pi!"。
+在 1.8 英寸 SPI 接口 TFT 彩屏上显示一张图片。
 
 ## 硬件准备
 
@@ -40,10 +40,21 @@ sudo apt install python3-smbus python3-spidev
 
 # 安装 adafruit-circuitpython-rgb-display 库
 pip3 install adafruit-circuitpython-rgb-display
-
-# （可选）安装中文字体，用于显示中文
-sudo apt install fonts-wqy-microhei
 ```
+
+### 3. 准备图片
+
+将图片文件 `g.jpg` 复制到树莓派的 `~/Desktop/workspace/PhysicalCoding/static/images/` 目录：
+
+```bash
+# 在本地创建目录并放入图片
+mkdir -p static/images
+# 将你的图片重命名为 g.jpg 放入 static/images 目录
+```
+
+图片要求：
+- 建议尺寸 128x128 像素
+- 格式支持 JPG、PNG 等常见格式
 
 ## 引脚分配
 
@@ -72,38 +83,35 @@ GPIO25(Pin 22)  ──── DC
 ## 运行代码
 
 ```bash
-python demos/06-tft-display/tft-display.py
+python demos/07-tft-image/tft-image.py
 ```
 
 或使用快速命令：
 
 ```bash
-npm run run 06
+npm run run 07
 ```
 
 ## 效果
 
-屏幕显示：
-- 深蓝色背景
-- 黄色文字 "Hello Pi!"
-- 青色文字 "TFT Works"
-- 几何图形测试（矩形、椭圆、线条）
+屏幕显示指定的图片文件 `g.jpg`。
 
 ## 关键知识点
 
-1. **SPI 通信协议**: 了解 SPI 的时钟、数据输入、片选等信号
-2. **adafruit-circuitpython-rgb-display**: 官方树莓派显示库
-3. **PIL 绘图**: 使用 Python Imaging Library 绘制图形和文字
+1. **adafruit-circuitpython-rgb-display**: 官方树莓派显示库
+2. **PIL 图像处理**: 使用 Python Imaging Library 处理和缩放图片
+3. **图片居中显示**: thumbnail + 创建背景画布实现居中
 
 ## 常见问题
 
-**屏幕不显示？**
-- 检查所有接线是否牢固
-- 检查 CS、D/C 接线是否正确
+**图片不显示？**
+- 检查图片路径是否正确
+- 确认图片文件存在且格式正确
+- 检查 SPI 接线是否正确
 - 确认库已正确安装
 
-**显示模糊？**
-- 尝试调整分辨率参数
+**图片显示变形？**
+- 尝试调整缩放方式
 
-**颜色显示异常？**
-- 检查 SDI (MOSI) 和 CLK 接线是否正确
+**色彩异常？**
+- 检查图片模式是否为 RGB

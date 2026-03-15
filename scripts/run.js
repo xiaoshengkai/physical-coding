@@ -78,12 +78,22 @@ function syncWithSftp(config, localDir, remoteDir) {
 function killRemoteProcess(config, demoName) {
   return new Promise((resolve) => {
     try {
+      // 强制杀掉所有可能占用 GPIO 的 Python 进程
       execSync(
-        `sshpass -p "${config.sshPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${config.sshPort} ${config.sshUser}@${config.raspberryPiIp} "pkill -9 -f 'python3.*tft-display' || pkill -9 -f 'python3.*${demoName}' || killall -9 python3"`,
+        `sshpass -p "${config.sshPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${config.sshPort} ${config.sshUser}@${config.raspberryPiIp} "pkill -9 -f 'python3' 2>/dev/null || true"`,
         { encoding: 'utf8', stdio: 'ignore' }
       );
+      
+      // 重置可能被占用的 GPIO 引脚 (D5=5, D25=25)
+      execSync(
+        `sshpass -p "${config.sshPassword}" ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 -p ${config.sshPort} ${config.sshUser}@${config.raspberryPiIp} "gpio -g mode 5 in && gpio -g mode 25 in && gpio -g mode 8 in" 2>/dev/null || true`,
+        { encoding: 'utf8', stdio: 'ignore' }
+      );
+      
+      // 等待一下让 GPIO 释放
+      execSync(`sleep 2`, { encoding: 'utf8' });
     } catch (e) {
-      console.log('⚠️  杀进程失败');
+      console.log('⚠️  清理进程/GPIO 失败，继续尝试...');
     }
     resolve();
   });
@@ -104,12 +114,11 @@ function runRemote(config, remoteScriptPath, demoName) {
       stdio: 'inherit'
     });
     
-    const handleInterrupt = () => {
+    const handleInterrupt = async () => {
       console.log('\n\n🛑 正在停止远程进程...');
-      killRemoteProcess(config, demoName).then(() => {
-        console.log('✅ 远程进程已停止，GPIO 已重置');
-        process.exit(0);
-      });
+      await killRemoteProcess(config, demoName);
+      console.log('✅ 远程进程已停止，GPIO 已重置');
+      process.exit(0);
     };
     
     proc.on('close', (code) => {
@@ -146,6 +155,12 @@ async function runDemo(input) {
   console.log(`📍 找到: ${relativePath}\n`);
   
   console.log('✅ 已连接树莓派（通过 sshpass）\n');
+  
+  // 先清理之前可能运行的程序和 GPIO
+  console.log('🧹 清理之前的进程和 GPIO...');
+  await killRemoteProcess(config, demoName);
+  console.log('✅ 清理完成\n');
+  
   console.log('📦 正在同步代码...');
   
   const localDemosDir = path.join(__dirname, '../demos', demoName);
