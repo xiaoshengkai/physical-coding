@@ -5,43 +5,46 @@ import time
 tm = tm1637.TM1637(clk=3, dio=2)
 tm.brightness(7)
 
-# 使用两个按钮，启用内部上拉
-btn_start = Button(26, pull_up=True, bounce_time=0.05)
-btn_reset = Button(19, pull_up=True, bounce_time=0.05)
+btn = Button(26, pull_up=True)
 
 running = False
-elapsed = 0
-last_time = 0
+elapsed = 0.0
+last_time = 0.0
+last_press = 0
+long_press_threshold = 1.0  # 长按1秒复位
 
-print("秒表已启动，按 Ctrl+C 退出")
-
+print("单按钮秒表：短按开始/暂停，长按复位")
 try:
     while True:
-        # 处理开始/暂停按钮
-        if btn_start.is_pressed:
-            # 避免长按多次触发，加小延时
-            time.sleep(0.1)
-            running = not running
-            if running:
-                last_time = time.time()
-                print("▶️ 开始")
+        now = time.time()
+        if btn.is_pressed:
+            press_start = time.time()
+            while btn.is_pressed:  # 等待松开
+                time.sleep(0.05)
+            press_duration = time.time() - press_start
+            if press_duration > long_press_threshold:
+                # 长按复位
+                running = False
+                elapsed = 0.0
+                tm.number(0)
+                print("↩️ 复位")
             else:
-                print("⏸️ 暂停")
-
-        # 处理复位按钮
-        if btn_reset.is_pressed:
-            time.sleep(0.1)
-            running = False
-            elapsed = 0
-            tm.number(0)
-            print("↩️ 复位")
+                # 短按切换
+                running = not running
+                if running:
+                    last_time = time.time()
+                    print("▶️ 开始")
+                else:
+                    print("⏸️ 暂停")
+            # 防抖延时
+            time.sleep(0.2)
 
         if running:
-            now = time.time()
-            elapsed += now - last_time
-            last_time = now
+            current = time.time()
+            elapsed += current - last_time
+            last_time = current
             if elapsed >= 10000:
-                elapsed = 0  # 防止溢出
+                elapsed = 0
             tm.number(int(elapsed))
 
         time.sleep(0.1)

@@ -7,3 +7,4 @@ config/config.json
 opencode.json
 skills/
 work-logs/
+.opencode/
