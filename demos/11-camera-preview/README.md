@@ -1,8 +1,8 @@
-# 11 - 摄像头预览
+# 11 - 摄像头拍照
 
 ## 实验目标
 
-使用树莓派官方摄像头模块 V2.1，通过 OpenCV 实时预览摄像头画面。
+使用树莓派官方摄像头模块 V2.1，按 Enter 键拍照并保存。
 
 ## 硬件准备
 
@@ -16,7 +16,7 @@
 
 ## 软件准备
 
-1. 启用摄像头（在树莓派终端执行）：
+1. 启用摄像头（在树莓派终端执行，如果没有配置说明已经开启了）：
 
 ```bash
 sudo raspi-config
@@ -30,10 +30,10 @@ sudo raspi-config
 rpicam-hello --list-cameras
 ```
 
-3. 安装 OpenCV：
+3. 安装 Picamera2：
 
 ```bash
-pip install opencv-python
+pip install picamera2
 ```
 
 ## 运行代码
@@ -50,10 +50,11 @@ npm run run 11
 
 ## 操作说明
 
-- 运行后显示实时摄像头画面
-- 按 `q` 键退出
+- 运行后按 Enter 键拍照
+- 照片保存在当前目录
+- 按 Ctrl+C 退出
 
 ## 效果
 
-- 窗口显示摄像头实时画面
-- 按 q 退出程序
+- 每次按 Enter 拍照并保存为 jpg 文件
+- 文件名带时间戳，如 photo_20260328_143022.jpg

@@ -1,23 +1,28 @@
-import cv2
+#!/usr/bin/env python3
+"""
+简单实验：按 Enter 键拍照
+使用 picamera2 库
+"""
 
-cap = cv2.VideoCapture(0)
-if not cap.isOpened():
-    print("无法打开摄像头")
-    exit()
+from picamera2 import Picamera2
+import time
 
-print("按 q 退出")
+picam2 = Picamera2()
+config = picam2.create_still_configuration()
+picam2.configure(config)
+picam2.start()
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("无法获取画面")
-        break
+print("摄像头已启动，按 Enter 键拍照（按 Ctrl+C 退出）")
 
-    cv2.imshow("Camera Preview", frame)
+try:
+    while True:
+        input()
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"photo_{timestamp}.jpg"
+        picam2.capture_file(filename)
+        print(f"✅ 照片已保存：{filename}")
 
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
-
-cap.release()
-cv2.destroyAllWindows()
-print("退出")
+except KeyboardInterrupt:
+    print("\n👋 退出")
+finally:
+    picam2.stop()
