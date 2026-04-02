@@ -2,12 +2,12 @@
 
 ## 实验目标
 
-使用树莓派官方摄像头模块 V2.1，按 Enter 键拍照并保存。
+使用树莓派官方摄像头模块 1.3版，拍照并保存。
 
 ## 硬件准备
 
 - 树莓派 4B
-- Raspberry Pi Camera Module V2.1
+- Raspberry Pi Camera Module 1.3
 - 摄像头排线
 
 ## 硬件连接
@@ -16,7 +16,7 @@
 
 ## 软件准备
 
-1. 启用摄像头（在树莓派终端执行，如果没有配置说明已经开启了）：
+1. 启用摄像头（如果未开启，在树莓派终端执行）：
 
 ```bash
 sudo raspi-config
@@ -28,7 +28,11 @@ sudo raspi-config
 
 ```bash
 rpicam-hello --list-cameras
+# 如果没有权限，尝试：
+sudo rpicam-hello --list-cameras
 ```
+
+正常输出示例：`0 : imx219 [3280x2464 10-bit RGGB]` 或 `ov5647`
 
 3. 安装 Picamera2：
 
@@ -48,13 +52,6 @@ python demos/11-camera-preview/main.py
 npm run run 11
 ```
 
-## 操作说明
-
-- 运行后按 Enter 键拍照
-- 照片保存在当前目录
-- 按 Ctrl+C 退出
-
 ## 效果
 
-- 每次按 Enter 拍照并保存为 jpg 文件
-- 文件名带时间戳，如 photo_20260328_143022.jpg
+- 照片保存为 test.jpg
