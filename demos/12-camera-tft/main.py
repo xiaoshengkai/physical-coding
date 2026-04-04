@@ -1,48 +1,59 @@
+import time
 import digitalio
 import busio
 import board
 from adafruit_rgb_display import st7735
 from PIL import Image
 from picamera2 import Picamera2
-from libcamera import controls
-import time
 
-# 屏幕初始化
+# --- 屏幕初始化（SPI 速度 10MHz）---
 spi = busio.SPI(clock=board.SCK, MOSI=board.MOSI)
 cs = digitalio.DigitalInOut(board.D5)
 dc = digitalio.DigitalInOut(board.D25)
-display = st7735.ST7735R(spi, cs=cs, dc=dc, width=128, height=160, baudrate=8000000)
+rst = digitalio.DigitalInOut(board.D27)
 
-# 摄像头初始化
+rst.direction = digitalio.Direction.OUTPUT
+rst.value = False
+time.sleep(0.1)
+rst.value = True
+time.sleep(0.1)
+
+display = st7735.ST7735R(
+    spi, cs=cs, dc=dc, rst=rst,
+    width=128, height=160,
+    baudrate=10000000          # 10MHz 稳定且快速
+)
+
+# --- 摄像头初始化 ---
 picam2 = Picamera2()
-# 提高采集分辨率，建议 640x480
 config = picam2.create_preview_configuration(
     main={"size": (640, 480), "format": "RGB888"},
     controls={"FrameRate": 30}
 )
 picam2.configure(config)
-# 手动白平衡（避免环境光影响）
-picam2.set_controls({
-    "AwbEnable": False,
-    "ColourGains": (1.3, 0.9)   # 可根据环境微调
-})
+picam2.set_controls({"AwbEnable": True})
 picam2.start()
-time.sleep(2)  # 预热
+time.sleep(1)
 
-print("取景器已启动，按 Ctrl+C 退出")
+screen_size = (display.width, display.height)
+
+def reduce_blue(image, factor=0.7):
+    r, g, b = image.split()
+    b = b.point(lambda x: int(x * factor))
+    return Image.merge("RGB", (r, g, b))
+
+print("取景器已启动（无延时版），按 Ctrl+C 退出")
 try:
     while True:
-        frame = picam2.capture_array()
-        if frame is None:
-            continue
-        img = Image.fromarray(frame)
-        # 使用高质量缩放算法
-        img = img.resize((display.width, display.height), Image.Resampling.LANCZOS)
+        img = picam2.capture_image()          # 等待摄像头捕获（自动限速）
+        r, g, b = img.split()
+        img = Image.merge("RGB", (b, g, r))   # 交换红蓝
+        img = reduce_blue(img, factor=0.7)    # 削弱蓝色
+        img = img.resize(screen_size, Image.Resampling.NEAREST)
         display.image(img)
-        # 控制帧率约 20-30fps（无需精确延时，防止过快）
-        time.sleep(0.03)
+        # 不加任何延时，让循环以摄像头实际帧率运行
 except KeyboardInterrupt:
     print("退出")
 finally:
     picam2.stop()
-    display.image(Image.new("RGB", (display.width, display.height), (0, 0, 0)))
+    display.image(Image.new("RGB", screen_size, (0, 0, 0)))

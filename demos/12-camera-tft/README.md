@@ -24,6 +24,7 @@
 | CLK (SCLK) | GPIO11 | Pin 23 |
 | CS | GPIO5 | Pin 29 |
 | DC | GPIO25 | Pin 22 |
+| RST | GPIO27 | Pin 13 |
 
 ### 摄像头
 
