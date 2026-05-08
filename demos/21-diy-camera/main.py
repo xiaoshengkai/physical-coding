@@ -1,107 +1,145 @@
 #!/usr/bin/env python3
-
-import sys
 import time
-import digitalio
-import board
-from adafruit_rgb_display import st7789
-from PIL import Image, ImageDraw
+import spidev
+import RPi.GPIO as GPIO
+import numpy as np
+from picamera2 import Picamera2
 
-def phase1_screen():
-    print("=== Phase 1: 屏幕测试 ===")
-    try:
-        spi = board.SPI()
-        cs_pin = digitalio.DigitalInOut(board.D5)
-        dc_pin = digitalio.DigitalInOut(board.D25)
-        reset_pin = digitalio.DigitalInOut(board.D27)
+# ================= 屏幕 =================
+LCD_W, LCD_H = 320, 480
+CAM_W, CAM_H = 320, 240
+OFFSET_X = (LCD_W - CAM_W) // 2
+OFFSET_Y = (LCD_H - CAM_H) // 2
 
-        display = st7789.ST7789(
-            spi,
-            cs=cs_pin,
-            dc=dc_pin,
-            rst=reset_pin,
-            width=480,
-            height=320,
-            baudrate=24000000,
-            rotation=0,          # 可尝试改为 0 测试
-        )
+# ================= GPIO =================
+DC, RST, CS = 24, 25, 5
+BUTTON_PIN = 17
+BUZZER_PIN = 18
 
-        # 打印实际尺寸，调试用
-        print(f"屏幕初始化成功，实际尺寸: {display.width} x {display.height}")
+GPIO.setwarnings(False)
+GPIO.cleanup()
+GPIO.setmode(GPIO.BCM)
 
-        # 使用 display.width 和 display.height 创建图像
-        image = Image.new("RGB", (display.width, display.height), "BLACK")
-        draw = ImageDraw.Draw(image)
-        draw.rectangle((20, 20, display.width-20, display.height-20), outline="GREEN", width=3)
-        draw.text((display.width//2-100, display.height//2-10), "DIY Camera Ready!", fill="WHITE")
-        display.image(image)
+GPIO.setup(DC, GPIO.OUT)
+GPIO.setup(RST, GPIO.OUT)
+GPIO.setup(CS, GPIO.OUT)
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(BUZZER_PIN, GPIO.OUT)
 
-        print("屏幕显示测试成功！按 Ctrl+C 退出")
-        while True:
-            time.sleep(1)
-    except Exception as e:
-        print(f"屏幕测试失败: {e}")
-        sys.exit(1)
+buzzer = GPIO.PWM(BUZZER_PIN, 1000)
+buzzer.start(0)
 
-def phase2_encoder():
-    print("=== Phase 2: 旋转编码器测试 ===")
-    try:
-        from gpiozero import RotaryEncoder
-        encoder = RotaryEncoder(a=17, b=18, wrap=100)
-        print("旋转旋钮查看数值变化")
-        print("按下按钮确认")
-        print("按 Ctrl+C 退出")
-        last_value = 0
-        while True:
-            current = encoder.value
-            if current != last_value:
-                direction = "+" if current > last_value else "-"
-                print(f"旋转 {direction}: {current}")
-                last_value = current
-            time.sleep(0.05)
-    except ImportError:
-        print("请安装: sudo pip3 install gpiozero")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n编码器测试结束")
+# ================= SPI =================
+spi = spidev.SpiDev()
+spi.open(0, 0)
+spi.max_speed_hz = 40000000
+spi.mode = 0
+GPIO.output(CS, 0)
 
-def phase3_camera():
-    print("=== Phase 3: 摄像头取景测试 ===")
-    try:
-        from picamera2 import Picamera2
-        picam2 = Picamera2()
-        config = picam2.create_preview_configuration(
-            main={"size": (480, 320), "format": "RGB888"}
-        )
-        picam2.configure(config)
-        picam2.start()
-        print("摄像头取景中，按 Ctrl+C 退出")
-        while True:
-            frame = picam2.capture_array()
-            # 此处可添加显示到屏幕的代码，但仅测试时不显示
-            time.sleep(0.1)
-    except ImportError:
-        print("请安装: sudo pip3 install picamera2")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n摄像头测试结束")
-    finally:
-        picam2.stop()
+# ================= LCD底层 =================
+def cmd(c):
+    GPIO.output(DC, 0)
+    spi.writebytes([c])
 
-def main():
-    print("DIY 相机 - 综合测试")
-    print("1. 屏幕测试")
-    print("2. 旋转编码器测试")
-    print("3. 摄像头取景测试")
-    choice = input("选择测试项目 (1-3): ").strip()
-    if choice == "1":
-        phase1_screen()
-    elif choice == "2":
-        phase2_encoder()
-    elif choice == "3":
-        phase3_camera()
-    else:
-        print("无效选择")
+def data(d):
+    GPIO.output(DC, 1)
+    spi.writebytes(d if isinstance(d, list) else [d])
 
-if __name__ == "__main__":
-    main()
+def reset():
+    GPIO.output(RST, 0)
+    time.sleep(0.1)
+    GPIO.output(RST, 1)
+    time.sleep(0.1)
+
+def lcd_init():
+    reset()
+    cmd(0x11)
+    time.sleep(0.12)
+    cmd(0x3A)
+    data(0x66)   # RGB666
+    cmd(0x36)
+    data(0x48)
+    cmd(0x29)
+    time.sleep(0.05)
+
+def set_window(x0, y0, x1, y1):
+    cmd(0x2A)
+    data([x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF])
+    cmd(0x2B)
+    data([y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF])
+    cmd(0x2C)
+
+def send_frame(buf):
+    GPIO.output(DC, 1)
+    chunk = 4096
+    for i in range(0, len(buf), chunk):
+        spi.xfer3(list(buf[i:i+chunk]))
+
+# ================= 图像转换 =================
+def rgb888_to_rgb666(arr):
+    r = arr[:, :, 2] & 0xFC
+    g = arr[:, :, 1] & 0xFC
+    b = arr[:, :, 0] & 0xFC
+    return np.dstack((r, g, b)).astype(np.uint8).flatten().tobytes()
+
+# ================= 摄像头 =================
+picam2 = Picamera2()
+config = picam2.create_video_configuration(
+    main={"size": (CAM_W, CAM_H), "format": "RGB888"},
+    controls={"FrameRate": 15}
+)
+picam2.configure(config)
+picam2.start()
+time.sleep(1)
+
+# ================= LCD初始化 =================
+lcd_init()
+black = bytes([0, 0, 0] * LCD_W * LCD_H)
+set_window(0, 0, LCD_W - 1, LCD_H - 1)
+send_frame(black)
+
+# ================= 主循环 =================
+prev_frame = None
+frame_count = 0
+
+try:
+    while True:
+        frame = picam2.capture_array()
+        frame_count += 1
+
+        # 自适应跳帧
+        if prev_frame is not None:
+            diff = np.abs(frame.astype(np.int16) - prev_frame.astype(np.int16))
+            if np.mean(diff) > 18:
+                if frame_count % 2 != 0:
+                    continue
+        prev_frame = frame
+
+        buf = rgb888_to_rgb666(frame)
+        set_window(OFFSET_X, OFFSET_Y, OFFSET_X + CAM_W - 1, OFFSET_Y + CAM_H - 1)
+        send_frame(buf)
+
+        # 按键拍照
+        if GPIO.input(BUTTON_PIN) == 0:
+            time.sleep(0.05)  # 防抖
+            if GPIO.input(BUTTON_PIN) == 0:
+                print("拍照！")
+                buzzer.ChangeDutyCycle(50)
+                time.sleep(0.1)
+                buzzer.ChangeDutyCycle(0)
+
+                img = picam2.capture_image()
+                timestamp = int(time.time())
+                img.save(f"photo_{timestamp}.jpg")
+                print(f"保存 photo_{timestamp}.jpg")
+
+                time.sleep(1)  # 拍照停留
+
+except KeyboardInterrupt:
+    print("退出")
+
+finally:
+    buzzer.stop()
+    picam2.stop()
+    GPIO.cleanup()
+    spi.close()

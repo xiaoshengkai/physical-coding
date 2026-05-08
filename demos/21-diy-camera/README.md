@@ -8,112 +8,237 @@
 |------|------|------|
 | 树莓派 4B | 1 | 主控 |
 | 摄像头 v1.3 | 1 | CSI 接口 |
-| 3.5寸 SPI 屏幕 ST779 | 1 | 480x320 |
+| 3.5寸 SPI 屏幕 ILI9488 | 1 | 480x320, [Wiki](http://www.lcdwiki.com/zh/3.5inch_SPI_Module_ILI9488_SKU:MSP3520) |
 | 旋转编码器 KY-040 | 1 | 带按钮 |
 | 按键 | 3 | 拍照、录像、菜单 |
-| 蜂鸣器 | 1 | 无源 |
+| 蜂鸣器 | 1 | 无源（需 PWM） |
 
 ## 接线
 
-### 屏幕 (ST779, 3.5寸 480x320)
+### 屏幕 (ILI9488, 3.5寸 480x320)
 
-| 屏幕引脚 | 功能 | 树莓派 GPIO | 物理引脚 | 备注 |
-|----------|------|-------------|----------|------|
-| VCC | 电源 (5V) | 5V | Pin 2/4 | 必须接 5V，否则背光不亮 |
-| GND | 地 | GND | Pin 6 | 共地 |
-| SCLK / SCK | SPI 时钟 | GPIO11 | Pin 23 | SPI 时钟线 |
-| MOSI / SDI | SPI 数据 | GPIO10 | Pin 19 | 数据线 |
-| CS / SS | 片选 | GPIO7 (CE1) | Pin 26 |
-| DC / RS | 数据/命令 | GPIO25 | Pin 22 | 数据/命令选择 |
-| RST | 复位 | GPIO27 | Pin 13 | 大多数驱动需要 |
-| BL | 背光 | 3.3V | Pin 1 | 背光供电 |
+| 屏幕引脚 | 功能 | 树莓派 GPIO | 物理引脚 |
+|----------|------|-------------|----------|
+| VCC | 电源 | 5V | Pin 2/4 |
+| GND | 地 | GND | Pin 6 |
+| SCLK | SPI 时钟 | GPIO11 | Pin 23 |
+| MOSI | SPI 数据 | GPIO10 | Pin 19 |
+| CS | 片选 | GPIO5 | Pin 29 |
+| DC | 数据/命令 | GPIO24 | Pin 18 |
+| RST | 复位 | GPIO25 | Pin 22 |
+| BL | 背光 | 3.3V | Pin 1 |
 
-### 旋转编码器 (KY-040)
+### 按键拍照 (GPIO17)
 
-| 编码器 | 树莓派 GPIO | 物理引脚 |
-|--------|-------------|----------|
-| CLK | GPIO17 | Pin 11 |
-| DT | GPIO18 | Pin 12 |
-| SW | GPIO22 | Pin 15 |
-| VCC | 3.3V | Pin 1 |
-| GND | GND | Pin 6 |
+```
+GND ──┐
+        │
+       [按键]
+        │
+GPIO17 ─┘
+```
 
-### 其他
+- GPIO17 接按键一端，另一端接 GND
+- 树莓派内置上拉，按下触发低电平
 
-| 模块 | GPIO | 物理引脚 |
-|------|------|----------|
-| 拍照按钮 | GPIO26 | Pin 37 |
-| 蜂鸣器 | GPIO21 | Pin 40 |
+### 蜂鸣器 (GPIO18, 无源蜂鸣器)
+
+| 蜂鸣器引脚 | 连接 |
+|------------|------|
+| I/O | GPIO18 |
+| VCC | 3.3V |
+| GND | GND |
+
+- 无源蜂鸣器需要 PWM 驱动
+- 频率 1000Hz，占空比 50% 发声
+
 
 ## 依赖安装
 
-### 1. 启用 SPI 接口
+```bash
+sudo apt update
+sudo apt install python3-pip python3-pil python3-numpy libcamera-tools
+pip3 install spidev gpiozero picamera2
+```
+
+## 启用 SPI
 
 ```bash
 sudo raspi-config
 ```
 
-选择 **Interface Options** → **SPI** → **Enable** → 重启树莓派
+选择 **Interface Options** → **SPI** → **Enable** → 重启
 
-或者直接检查是否已启用：
-
+验证：
 ```bash
 ls /dev/spi*
 ```
 
-如果看到 `/dev/spidev0.0` 和 `/dev/spidev0.1`，说明 SPI 已启用。
+应看到 `/dev/spidev0.0` 和 `/dev/spidev0.1`
 
-### 2. 安装 Python 库
+## 测试摄像头
 
 ```bash
-sudo apt update
-sudo pip3 install adafruit-circuitpython-rgb-display pillow gpiozero picamera2
+rpicam-hello
 ```
 
-## 运行测试
+有日志输出说明正确。
+
+## 运行
 
 ```bash
 cd demos/21-diy-camera
 python3 main.py
 ```
 
-按数字选择测试各个模块。
-
-## 项目阶段
+## 渐进式开发步骤
 
 ### Phase 1: 点亮屏幕
 
-显示红、绿、蓝纯色，确认驱动正常。
+**目标**: 确认屏幕驱动正常
 
-### Phase 2: 旋转编码器
+**关键点**:
+1. 向商家索要 Wiki 文档，确认芯片型号（ILI9341 vs ILI9488）
+2. 根据芯片选择正确的色彩模式（RGB565 vs RGB666）
+3. ILI9488 必须用 RGB666
 
-读取旋钮方向和按钮按下事件。
+```python
+cmd(0x3A)
+data(0x66)  # RGB666
+```
 
-### Phase 3: 摄像头取景
+**测试代码**: 红绿蓝白黑循环显示
 
-实时显示摄像头画面在屏幕上。
+### Phase 2: 摄像头预览
 
-### Phase 4: 按键拍照 + 蜂鸣器提示
+**目标**: 摄像头画面显示在屏幕上
 
-按下按键拍照，蜂鸣器响一声。
+**前置**: `rpicam-hello` 测试通过
 
-### Phase 5: 数码变焦
+**关键点**:
+1. Picamera2 输出 RGB888，需转换为 RGB666
+2. 分辨率影响帧率，需要权衡
+3. 居中显示比拉伸更美观
 
-旋钮控制变焦倍数 (1x-4x)。
+**分辨率与帧率对照**:
 
-### Phase 6: 录像
+| 分辨率 | 帧率体验 |
+|--------|----------|
+| 320×240 | 卡顿 |
+| 280×210 | 可接受 |
+| 192×144 | 流畅 |
+| 160×120 | 很流畅 |
 
-长按切换拍照/录像模式。
+**保持 4:3 比例避免拉伸变形**
 
-### Phase 7: 菜单界面
+### Phase 3: 按键拍照 + 蜂鸣器
 
-OSD 菜单调整白平衡等参数。
+**目标**: 按键拍照并保存高清照片
 
-## 引脚约定
+**设计思路**:
 
-- 屏幕 CS → GPIO8
-- 屏幕 DC → GPIO25
-- 屏幕 RST → GPIO27
-- 旋钮 CLK → GPIO17, DT → GPIO18, SW → GPIO22
-- 拍照按钮 → GPIO26
-- 蜂鸣器 → GPIO21
+1. **按键**: 轮询 + 内置上拉，简单不破坏预览循环
+2. **蜂鸣器**: 无源蜂鸣器，PWM 驱动
+3. **拍照**: 预览低分辨率，拍照高分辨率
+
+**关键代码**:
+
+```python
+# 按键检测（内置上拉）
+GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# 无源蜂鸣器 PWM
+buzzer = GPIO.PWM(BUZZER_PIN, 1000)
+buzzer.start(0)
+
+# 主循环中轮询
+if GPIO.input(BUTTON_PIN) == 0:  # 按下
+    buzzer.ChangeDutyCycle(50)   # 蜂鸣
+    time.sleep(0.1)
+    buzzer.ChangeDutyCycle(0)
+    img = picam2.capture_image() # 高清拍照
+    img.save(f"photo_{timestamp}.jpg")
+```
+
+**预览 vs 拍照**:
+
+| 模式 | 分辨率 | 目的 |
+|------|--------|------|
+| 预览 | 320×240 | 流畅 |
+| 拍照 | 传感器最高 | 清晰 |
+
+## 性能调优经验
+
+### 核心问题
+
+SPI 带宽有限，高分辨率 + 高帧率 = 不可能三角
+
+### 优化策略
+
+#### 1. SPI 提速
+
+```python
+spi.max_speed_hz = 40000000  # 40MHz 极限
+```
+
+#### 2. 降低分辨率
+
+最大收益，帧率直接提升
+
+#### 3. 居中显示
+
+不拉伸，保持画面比例
+
+#### 4. 跳帧
+
+```python
+if frame_count % 2 != 0:
+    continue
+```
+
+用时间换带宽
+
+#### 5. 自适应跳帧
+
+检测运动幅度，大运动时自动降帧：
+
+```python
+def is_motion_large(prev, curr, threshold=18):
+    diff = np.abs(curr.astype(np.int16) - prev.astype(np.int16))
+    return np.mean(diff) > threshold
+```
+
+### 本质
+
+实时系统的 trade-off：**分辨率 vs 流畅度**
+
+| 模式 | 分辨率 | 目的 |
+|------|--------|------|
+| 预览 | 低 | 流畅 |
+| 拍照 | 高 | 清晰 |
+
+## 调试经验
+
+### 白屏
+
+- 原因：驱动不匹配
+- 解决：确认芯片型号（看 Wiki 或问商家）
+
+### 黑屏/花屏
+
+- 原因：色彩模式错误
+- 解决：ILI9488 用 RGB666（0x66）
+
+### 卡顿严重
+
+- 原因：分辨率过高
+- 解决：降到 192×144 或更低
+
+## 项目阶段
+
+- [x] Phase 1: 点亮屏幕
+- [x] Phase 2: 摄像头预览
+- [x] Phase 3: 按键拍照 + 蜂鸣器提示
+- [ ] Phase 4: 数码变焦（旋钮控制）
+- [ ] Phase 5: 录像
+- [ ] Phase 6: 菜单界面
